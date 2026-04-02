@@ -26,7 +26,22 @@ jobs:
           cache: maven
 
       - name: Run tests
-        run: mvn verify
+        run: mvn verify 2>&1 | tee build-output.log || true
+
+      - name: Check build result
+        run: |
+          if grep -q "BUILD FAILURE" build-output.log; then
+            echo "::error::Maven build failed. See build-log artifact for details."
+            grep -A 30 "BUILD FAILURE\|ERROR\|COMPILATION ERROR\|cannot find symbol" build-output.log || true
+            exit 1
+          fi
+
+      - name: Upload build log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-log
+          path: build-output.log
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
