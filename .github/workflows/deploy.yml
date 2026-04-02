@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 env:
   AWS_REGION: ap-northeast-1
   ECR_REPOSITORY: purchase-request-app
@@ -26,7 +30,44 @@ jobs:
           cache: maven
 
       - name: Run tests
-        run: ./mvnw verify
+        id: maven
+        run: |
+          mvn verify 2>&1 | tee build-output.log
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Post build log to PR
+        if: always() && steps.maven.outputs.exit_code != '0' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let body = '## Build Failure\n';
+            if (fs.existsSync('build-output.log')) {
+              const log = fs.readFileSync('build-output.log', 'utf8');
+              const lines = log.split('\n');
+              const tail = lines.slice(-120).join('\n');
+              body += '```\n' + tail + '\n```';
+            } else {
+              body += 'build-output.log not found';
+            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
+
+      - name: Fail if build failed
+        if: always() && steps.maven.outputs.exit_code != '0'
+        run: exit 1
+
+      - name: Upload build log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-log
+          path: build-output.log
 
       - name: Upload test results
         uses: actions/upload-artifact@v4

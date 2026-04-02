@@ -7,6 +7,9 @@ variable "instance_class" { type = string }
 variable "allocated_storage" { type = number }
 variable "database_name" { type = string }
 variable "master_username" { type = string }
-variable "master_password" { type = string sensitive = true }
+variable "master_password" {
+  type      = string
+  sensitive = true
+}
 variable "multi_az" { type = bool default = false }
 variable "backup_retention_period" { type = number default = 7 }

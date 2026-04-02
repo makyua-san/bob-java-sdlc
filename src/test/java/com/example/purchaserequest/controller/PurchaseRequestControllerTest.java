@@ -11,8 +11,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import com.example.purchaserequest.config.SecurityConfig;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.bean.MockBean;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
@@ -23,13 +26,28 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(PurchaseRequestController.class)
+@Import(SecurityConfig.class)
 class PurchaseRequestControllerTest {
+
+    @TestConfiguration
+    static class MockConfig {
+        @Bean
+        public PurchaseRequestService purchaseRequestService() {
+            return mock(PurchaseRequestService.class);
+        }
+
+        @Bean
+        public UserRepository userRepository() {
+            return mock(UserRepository.class);
+        }
+    }
 
     @Autowired
     private MockMvc mockMvc;
@@ -37,10 +55,10 @@ class PurchaseRequestControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockBean
+    @Autowired
     private PurchaseRequestService purchaseRequestService;
 
-    @MockBean
+    @Autowired
     private UserRepository userRepository;
 
     private User createTestUser() {
