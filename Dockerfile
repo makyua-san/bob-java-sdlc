@@ -1,12 +1,17 @@
 # ビルドステージ
 FROM eclipse-temurin:21-jdk-alpine AS builder
 WORKDIR /app
-COPY mvnw .
-COPY .mvn .mvn
+
+# Mavenをインストール
+RUN apk add --no-cache maven
+
+# 依存関係をダウンロード（キャッシュ活用）
 COPY pom.xml .
-RUN ./mvnw dependency:go-offline
+RUN mvn dependency:go-offline
+
+# ソースコードをコピーしてビルド
 COPY src src
-RUN ./mvnw clean package -DskipTests
+RUN mvn clean package -DskipTests
 
 # 実行ステージ
 FROM eclipse-temurin:21-jre-alpine
