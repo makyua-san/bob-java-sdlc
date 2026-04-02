@@ -1,0 +1,46 @@
+spring:
+  application:
+    name: purchase-request-app
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+# アプリケーション固有設定
+purchase:
+  request:
+    high-amount-threshold: 50000
+    page-size: 20
+
+# Actuator設定
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# ログ設定
+logging:
+  level:
+    root: INFO
+    com.example.purchaserequest: INFO
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE

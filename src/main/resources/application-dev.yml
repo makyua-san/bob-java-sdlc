@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/purchase_request_dev
+    username: dev_user
+    password: dev_password
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+logging:
+  level:
+    com.example.purchaserequest: DEBUG
+    org.springframework.security: DEBUG
+
+# 開発用設定
+purchase:
+  request:
+    high-amount-threshold: 10000
