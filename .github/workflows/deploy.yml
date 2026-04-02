@@ -29,10 +29,13 @@ jobs:
         run: mvn verify 2>&1 | tee build-output.log || true
 
       - name: Check build result
+        if: always()
         run: |
           if grep -q "BUILD FAILURE" build-output.log; then
-            echo "::error::Maven build failed. See build-log artifact for details."
-            grep -A 30 "BUILD FAILURE\|ERROR\|COMPILATION ERROR\|cannot find symbol" build-output.log || true
+            echo "## Build Failure Details" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            tail -80 build-output.log >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
 
