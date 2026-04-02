@@ -28,14 +28,30 @@ jobs:
       - name: Run tests
         run: mvn verify 2>&1 | tee build-output.log || true
 
+      - name: Post build errors to PR
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            if (fs.existsSync('build-output.log')) {
+              const log = fs.readFileSync('build-output.log', 'utf8');
+              if (log.includes('BUILD FAILURE')) {
+                const lines = log.split('\n');
+                const last100 = lines.slice(-100).join('\n');
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: `## Build Failure Details\n\`\`\`\n${last100}\n\`\`\``
+                });
+              }
+            }
+
       - name: Check build result
         if: always()
         run: |
           if grep -q "BUILD FAILURE" build-output.log; then
-            echo "## Build Failure Details" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            tail -80 build-output.log >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
 
