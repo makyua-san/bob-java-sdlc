@@ -3,6 +3,7 @@ package com.example.purchaserequest.controller;
 import com.example.purchaserequest.model.RequestStatus;
 import com.example.purchaserequest.model.dto.ApiResponse;
 import com.example.purchaserequest.model.dto.CreatePurchaseRequestDto;
+import com.example.purchaserequest.model.dto.DeletedPurchaseRequestDto;
 import com.example.purchaserequest.model.dto.PurchaseRequestDto;
 import com.example.purchaserequest.model.dto.RejectRequestDto;
 import com.example.purchaserequest.service.PurchaseRequestService;
@@ -81,6 +82,16 @@ public class PurchaseRequestController {
         Long userId = getUserId(userDetails);
         PurchaseRequestDto result = purchaseRequestService.approveRequest(id, userId);
         return ResponseEntity.ok(ApiResponse.success(result, "申請を承認しました"));
+    }
+
+    /** 下書き申請を削除（論理削除） */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<DeletedPurchaseRequestDto>> deleteDraftRequest(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        String username = userDetails.getUsername();
+        DeletedPurchaseRequestDto result = purchaseRequestService.deleteDraftRequest(id, username);
+        return ResponseEntity.ok(ApiResponse.success(result, "下書きを削除しました"));
     }
 
     /** 申請却下 */
