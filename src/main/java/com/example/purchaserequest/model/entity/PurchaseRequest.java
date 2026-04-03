@@ -12,7 +12,8 @@ import java.time.LocalDateTime;
 @Table(name = "purchase_requests", indexes = {
     @Index(name = "idx_status", columnList = "status"),
     @Index(name = "idx_requester_id", columnList = "requester_id"),
-    @Index(name = "idx_created_at", columnList = "created_at")
+    @Index(name = "idx_created_at", columnList = "created_at"),
+    @Index(name = "idx_deleted", columnList = "deleted")
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -67,6 +68,16 @@ public class PurchaseRequest {
     @Column(nullable = false, length = 50)
     private String updatedBy;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean deleted = false;
+
+    @Column
+    private LocalDateTime deletedAt;
+
+    @Column(length = 50)
+    private String deletedBy;
+
     /**
      * 合計金額を計算
      */
@@ -102,6 +113,30 @@ public class PurchaseRequest {
         this.status = RequestStatus.APPROVED;
         this.approverId = approverId;
         this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 申請を論理削除
+     */
+    public void delete(String username) {
+        if (status != RequestStatus.DRAFT) {
+            throw new IllegalStateException("下書き状態の申請のみ削除できます");
+        }
+        if (deleted) {
+            throw new IllegalStateException("この申請は既に削除されています");
+        }
+        this.deleted = true;
+        this.deletedAt = LocalDateTime.now();
+        this.deletedBy = username;
+        this.updatedAt = LocalDateTime.now();
+        this.updatedBy = username;
+    }
+
+    /**
+     * 削除済みかどうかを判定
+     */
+    public boolean isDeleted() {
+        return deleted != null && deleted;
     }
 
     /**

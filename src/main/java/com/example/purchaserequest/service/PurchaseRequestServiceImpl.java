@@ -1,10 +1,12 @@
 package com.example.purchaserequest.service;
 
 import com.example.purchaserequest.config.ApplicationConfig;
+import com.example.purchaserequest.exception.InvalidStatusTransitionException;
 import com.example.purchaserequest.exception.RequestNotFoundException;
 import com.example.purchaserequest.exception.UnauthorizedOperationException;
 import com.example.purchaserequest.model.RequestStatus;
 import com.example.purchaserequest.model.dto.CreatePurchaseRequestDto;
+import com.example.purchaserequest.model.dto.DeletedPurchaseRequestDto;
 import com.example.purchaserequest.model.dto.PurchaseRequestDto;
 import com.example.purchaserequest.model.dto.UserSummaryDto;
 import com.example.purchaserequest.model.entity.PurchaseRequest;
@@ -91,7 +93,7 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
     public PurchaseRequestDto submitRequest(Long requestId, Long requesterId) {
         long startTime = System.currentTimeMillis();
 
-        PurchaseRequest request = purchaseRequestRepository.findById(requestId)
+        PurchaseRequest request = purchaseRequestRepository.findByIdAndDeletedFalse(requestId)
             .orElseThrow(() -> new RequestNotFoundException("申請が見つかりません"));
 
         validateOwnership(request, requesterId);
@@ -119,12 +121,12 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
 
         if (isApprover) {
             requests = (status != null)
-                ? purchaseRequestRepository.findByStatus(status, pageable)
-                : purchaseRequestRepository.findAll(pageable);
+                ? purchaseRequestRepository.findByStatusAndDeletedFalse(status, pageable)
+                : purchaseRequestRepository.findByDeletedFalse(pageable);
         } else {
             requests = (status != null)
-                ? purchaseRequestRepository.findByRequesterIdAndStatus(userId, status, pageable)
-                : purchaseRequestRepository.findByRequesterId(userId, pageable);
+                ? purchaseRequestRepository.findByRequesterIdAndStatusAndDeletedFalse(userId, status, pageable)
+                : purchaseRequestRepository.findByRequesterIdAndDeletedFalse(userId, pageable);
         }
 
         return requests.map(this::toDtoWithUsers);
@@ -132,7 +134,7 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
 
     @Override
     public PurchaseRequestDto getRequestById(Long requestId, Long userId, boolean isApprover) {
-        PurchaseRequest request = purchaseRequestRepository.findById(requestId)
+        PurchaseRequest request = purchaseRequestRepository.findByIdAndDeletedFalse(requestId)
             .orElseThrow(() -> new RequestNotFoundException("申請が見つかりません"));
 
         if (!isApprover) {
@@ -151,7 +153,7 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
             .orElseThrow(() -> new RequestNotFoundException("ユーザーが見つかりません"));
         validateApprovalAuthority(approver);
 
-        PurchaseRequest request = purchaseRequestRepository.findById(requestId)
+        PurchaseRequest request = purchaseRequestRepository.findByIdAndDeletedFalse(requestId)
             .orElseThrow(() -> new RequestNotFoundException("申請が見つかりません"));
 
         request.approve(approverId);
@@ -183,7 +185,7 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
             .orElseThrow(() -> new RequestNotFoundException("ユーザーが見つかりません"));
         validateApprovalAuthority(approver);
 
-        PurchaseRequest request = purchaseRequestRepository.findById(requestId)
+        PurchaseRequest request = purchaseRequestRepository.findByIdAndDeletedFalse(requestId)
             .orElseThrow(() -> new RequestNotFoundException("申請が見つかりません"));
 
         request.reject(approverId, rejectionReason);
@@ -205,6 +207,65 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
         businessMetrics.recordPurchaseRequest(RequestStatus.REJECTED, saved.getTotalAmount());
 
         return toDto(saved, requester, approver);
+    }
+
+    @Override
+    @Transactional
+    public DeletedPurchaseRequestDto deleteDraftRequest(Long id, String username) {
+        long startTime = System.currentTimeMillis();
+
+        // 1. 申請を取得（削除済みを含む）
+        PurchaseRequest request = purchaseRequestRepository.findById(id)
+            .orElseThrow(() -> {
+                businessLogger.logBusinessEvent("DELETE_DRAFT", "申請が見つかりません",
+                    Map.of("requestId", id, "username", username));
+                return new RequestNotFoundException("申請が見つかりません");
+            });
+
+        // 2. 削除済みチェック
+        if (request.isDeleted()) {
+            businessLogger.logBusinessEvent("DELETE_DRAFT", "既に削除済みの申請",
+                Map.of("requestId", id, "username", username));
+            throw new IllegalStateException("この申請は既に削除されています");
+        }
+
+        // 3. 申請者本人チェック
+        User currentUser = userRepository.findByUsername(username)
+            .orElseThrow(() -> new UnauthorizedOperationException("ユーザーが見つかりません"));
+
+        if (!request.getRequesterId().equals(currentUser.getId())) {
+            businessLogger.logBusinessEvent("DELETE_DRAFT", "権限不足による削除拒否",
+                Map.of("requestId", id, "username", username, "requesterId", request.getRequesterId()));
+            throw new UnauthorizedOperationException("自分の申請のみ削除できます");
+        }
+
+        // 4. ステータスチェック（エンティティ内で実施）
+        try {
+            request.delete(username);
+        } catch (IllegalStateException e) {
+            businessLogger.logBusinessEvent("DELETE_DRAFT", "不正なステータスでの削除",
+                Map.of("requestId", id, "username", username, "status", request.getStatus().name()));
+            throw new InvalidStatusTransitionException(e.getMessage());
+        }
+
+        // 5. 保存
+        PurchaseRequest deletedRequest = purchaseRequestRepository.save(request);
+
+        // 6. ログ・メトリクス
+        Map<String, Object> context = Map.of(
+            "requestId", deletedRequest.getId(),
+            "username", username,
+            "duration", System.currentTimeMillis() - startTime
+        );
+        businessLogger.logBusinessEvent("DELETE_DRAFT", "下書き申請を削除しました", context);
+        businessMetrics.recordBusinessEvent("DELETE_DRAFT", "success");
+
+        // 7. DTOに変換して返却
+        return DeletedPurchaseRequestDto.builder()
+            .id(deletedRequest.getId())
+            .deleted(deletedRequest.getDeleted())
+            .deletedAt(deletedRequest.getDeletedAt())
+            .build();
     }
 
     private void validateApprovalAuthority(User user) {

@@ -83,6 +83,44 @@ class PurchaseRequestTest {
     }
 
     @Nested
+    @DisplayName("論理削除テスト")
+    class DeleteTest {
+
+        @Test
+        @DisplayName("下書き状態の申請を削除できること")
+        void 下書き状態の申請を削除できること() {
+            PurchaseRequest request = createDraftRequest();
+            request.delete("yamada");
+
+            assertThat(request.getDeleted()).isTrue();
+            assertThat(request.isDeleted()).isTrue();
+            assertThat(request.getDeletedAt()).isNotNull();
+            assertThat(request.getDeletedBy()).isEqualTo("yamada");
+            assertThat(request.getUpdatedBy()).isEqualTo("yamada");
+        }
+
+        @Test
+        @DisplayName("ステータスがDRAFT以外の場合に例外が発生すること")
+        void 申請済みの場合は削除できないこと() {
+            PurchaseRequest request = createSubmittedRequest();
+            assertThatThrownBy(() -> request.delete("yamada"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("下書き状態の申請のみ削除できます");
+        }
+
+        @Test
+        @DisplayName("既に削除済みの場合に例外が発生すること")
+        void 既に削除済みの場合は例外が発生すること() {
+            PurchaseRequest request = createDraftRequest();
+            request.delete("yamada");
+
+            assertThatThrownBy(() -> request.delete("yamada"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("この申請は既に削除されています");
+        }
+    }
+
+    @Nested
     @DisplayName("ステータス遷移テスト")
     class StatusTransitionTest {
 

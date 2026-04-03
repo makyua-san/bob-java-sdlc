@@ -80,10 +80,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ErrorResponse> handleIllegalState(IllegalStateException ex) {
+        String code = ex.getMessage() != null && ex.getMessage().contains("既に削除")
+            ? "ALREADY_DELETED"
+            : "INVALID_STATUS_TRANSITION";
         ErrorResponse error = ErrorResponse.builder()
             .status("error")
             .error(ErrorResponse.ErrorDetail.builder()
-                .code("INVALID_STATUS_TRANSITION")
+                .code(code)
                 .message(ex.getMessage())
                 .build())
             .timestamp(LocalDateTime.now())
