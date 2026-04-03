@@ -1,6 +1,7 @@
 package com.example.purchaserequest.controller;
 
 import com.example.purchaserequest.model.RequestStatus;
+import com.example.purchaserequest.model.dto.DeletedPurchaseRequestDto;
 import com.example.purchaserequest.model.dto.PurchaseRequestDto;
 import com.example.purchaserequest.model.dto.UserSummaryDto;
 import com.example.purchaserequest.model.entity.User;
@@ -143,6 +144,27 @@ class PurchaseRequestControllerTest {
     void 認証なしでアクセスすると401が返ること() throws Exception {
         mockMvc.perform(get("/api/v1/requests"))
             .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("下書き削除APIが正常に動作すること")
+    @WithMockUser(username = "yamada", roles = {"USER"})
+    void 下書き削除APIが正常に動作すること() throws Exception {
+        when(userRepository.findByUsername("yamada")).thenReturn(Optional.of(createTestUser()));
+        DeletedPurchaseRequestDto deletedDto = DeletedPurchaseRequestDto.builder()
+            .id(1L)
+            .deleted(true)
+            .deletedAt(LocalDateTime.now())
+            .build();
+        when(purchaseRequestService.deleteDraftRequest(eq(1L), eq("yamada"))).thenReturn(deletedDto);
+
+        mockMvc.perform(delete("/api/v1/requests/1")
+                .with(csrf()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("success"))
+            .andExpect(jsonPath("$.data.id").value(1))
+            .andExpect(jsonPath("$.data.deleted").value(true))
+            .andExpect(jsonPath("$.message").value("下書きを削除しました"));
     }
 
     @Test

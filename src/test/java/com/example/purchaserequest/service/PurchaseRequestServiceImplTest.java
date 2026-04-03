@@ -5,7 +5,9 @@ import com.example.purchaserequest.exception.RequestNotFoundException;
 import com.example.purchaserequest.exception.UnauthorizedOperationException;
 import com.example.purchaserequest.model.RequestStatus;
 import com.example.purchaserequest.model.Role;
+import com.example.purchaserequest.exception.InvalidStatusTransitionException;
 import com.example.purchaserequest.model.dto.CreatePurchaseRequestDto;
+import com.example.purchaserequest.model.dto.DeletedPurchaseRequestDto;
 import com.example.purchaserequest.model.dto.PurchaseRequestDto;
 import com.example.purchaserequest.model.entity.PurchaseRequest;
 import com.example.purchaserequest.model.entity.User;
@@ -226,6 +228,129 @@ class PurchaseRequestServiceImplTest {
             assertThatThrownBy(() -> service.approveRequest(1L, 1L))
                 .isInstanceOf(UnauthorizedOperationException.class)
                 .hasMessage("承認権限がありません");
+        }
+    }
+
+    @Nested
+    @DisplayName("下書き削除テスト")
+    class DeleteDraftRequestTest {
+
+        @Test
+        @DisplayName("正常に下書き申請を削除できること")
+        void 正常に下書き申請を削除できること() {
+            PurchaseRequest request = PurchaseRequest.builder()
+                .id(1L)
+                .requesterId(1L)
+                .itemName("ノートPC")
+                .quantity(1)
+                .unitPrice(new BigDecimal("150000"))
+                .purchaseReason("開発業務用")
+                .status(RequestStatus.DRAFT)
+                .deleted(false)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .createdBy("yamada")
+                .updatedBy("yamada")
+                .build();
+
+            when(purchaseRequestRepository.findById(1L)).thenReturn(Optional.of(request));
+            when(userRepository.findByUsername("yamada")).thenReturn(Optional.of(normalUser));
+            when(purchaseRequestRepository.save(any(PurchaseRequest.class))).thenReturn(request);
+
+            DeletedPurchaseRequestDto result = service.deleteDraftRequest(1L, "yamada");
+
+            assertThat(result.getId()).isEqualTo(1L);
+            assertThat(result.getDeleted()).isTrue();
+            assertThat(result.getDeletedAt()).isNotNull();
+            verify(purchaseRequestRepository).save(any(PurchaseRequest.class));
+        }
+
+        @Test
+        @DisplayName("申請が存在しない場合に例外が発生すること")
+        void 申請が存在しない場合に例外が発生() {
+            when(purchaseRequestRepository.findById(999L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.deleteDraftRequest(999L, "yamada"))
+                .isInstanceOf(RequestNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("削除済みの場合に例外が発生すること")
+        void 削除済みの場合に例外が発生() {
+            PurchaseRequest request = PurchaseRequest.builder()
+                .id(1L)
+                .requesterId(1L)
+                .itemName("ノートPC")
+                .quantity(1)
+                .unitPrice(new BigDecimal("150000"))
+                .purchaseReason("開発業務用")
+                .status(RequestStatus.DRAFT)
+                .deleted(true)
+                .deletedAt(LocalDateTime.now())
+                .deletedBy("yamada")
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .createdBy("yamada")
+                .updatedBy("yamada")
+                .build();
+
+            when(purchaseRequestRepository.findById(1L)).thenReturn(Optional.of(request));
+
+            assertThatThrownBy(() -> service.deleteDraftRequest(1L, "yamada"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("この申請は既に削除されています");
+        }
+
+        @Test
+        @DisplayName("申請者本人でない場合に例外が発生すること")
+        void 申請者本人でない場合に例外が発生() {
+            PurchaseRequest request = PurchaseRequest.builder()
+                .id(1L)
+                .requesterId(1L)
+                .itemName("ノートPC")
+                .quantity(1)
+                .unitPrice(new BigDecimal("150000"))
+                .purchaseReason("開発業務用")
+                .status(RequestStatus.DRAFT)
+                .deleted(false)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .createdBy("yamada")
+                .updatedBy("yamada")
+                .build();
+
+            when(purchaseRequestRepository.findById(1L)).thenReturn(Optional.of(request));
+            when(userRepository.findByUsername("sato")).thenReturn(Optional.of(approverUser));
+
+            assertThatThrownBy(() -> service.deleteDraftRequest(1L, "sato"))
+                .isInstanceOf(UnauthorizedOperationException.class)
+                .hasMessage("自分の申請のみ削除できます");
+        }
+
+        @Test
+        @DisplayName("ステータスがDRAFT以外の場合に例外が発生すること")
+        void ステータスがDRAFT以外の場合に例外が発生() {
+            PurchaseRequest request = PurchaseRequest.builder()
+                .id(1L)
+                .requesterId(1L)
+                .itemName("ノートPC")
+                .quantity(1)
+                .unitPrice(new BigDecimal("150000"))
+                .purchaseReason("開発業務用")
+                .status(RequestStatus.SUBMITTED)
+                .deleted(false)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .createdBy("yamada")
+                .updatedBy("yamada")
+                .build();
+
+            when(purchaseRequestRepository.findById(1L)).thenReturn(Optional.of(request));
+            when(userRepository.findByUsername("yamada")).thenReturn(Optional.of(normalUser));
+
+            assertThatThrownBy(() -> service.deleteDraftRequest(1L, "yamada"))
+                .isInstanceOf(InvalidStatusTransitionException.class)
+                .hasMessage("下書き状態の申請のみ削除できます");
         }
     }
 

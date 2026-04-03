@@ -35,4 +35,33 @@ public interface PurchaseRequestRepository extends JpaRepository<PurchaseRequest
      * 申請者IDとIDで検索
      */
     Optional<PurchaseRequest> findByIdAndRequesterId(Long id, Long requesterId);
+
+    /**
+     * 削除されていない申請を申請者IDで検索
+     */
+    Page<PurchaseRequest> findByRequesterIdAndDeletedFalse(Long requesterId, Pageable pageable);
+
+    /**
+     * 削除されていない申請をステータスで検索
+     */
+    Page<PurchaseRequest> findByStatusAndDeletedFalse(RequestStatus status, Pageable pageable);
+
+    /**
+     * 削除されていない申請を申請者IDとステータスで検索
+     */
+    Page<PurchaseRequest> findByRequesterIdAndStatusAndDeletedFalse(
+        Long requesterId,
+        RequestStatus status,
+        Pageable pageable
+    );
+
+    /**
+     * 削除されていない申請をIDで検索
+     */
+    Optional<PurchaseRequest> findByIdAndDeletedFalse(Long id);
+
+    /**
+     * 削除されていない申請を全件検索
+     */
+    Page<PurchaseRequest> findByDeletedFalse(Pageable pageable);
 }

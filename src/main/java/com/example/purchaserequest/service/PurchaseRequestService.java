@@ -2,6 +2,7 @@ package com.example.purchaserequest.service;
 
 import com.example.purchaserequest.model.RequestStatus;
 import com.example.purchaserequest.model.dto.CreatePurchaseRequestDto;
+import com.example.purchaserequest.model.dto.DeletedPurchaseRequestDto;
 import com.example.purchaserequest.model.dto.PurchaseRequestDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,4 +26,7 @@ public interface PurchaseRequestService {
 
     /** 申請を却下 */
     PurchaseRequestDto rejectRequest(Long requestId, Long approverId, String rejectionReason);
+
+    /** 下書き申請を削除（論理削除） */
+    DeletedPurchaseRequestDto deleteDraftRequest(Long id, String username);
 }
